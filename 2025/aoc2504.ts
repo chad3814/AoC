@@ -1,4 +1,5 @@
 import { logger, NotImplemented, run } from "aoc-copilot";
+import { dumpGrid } from "../utils/grid";
 
 type AdditionalInfo = {
   [key: string]: string;
@@ -17,13 +18,6 @@ function countRolls(map: string[][], x: number, y: number): number {
   return rolls;
 }
 
-function dump(map: string[][]) {
-  logger.log(`map ${map[0].length}, ${map.length}:`);
-  for (const row of map) {
-    logger.log(row.join(""));
-  }
-}
-
 export async function solve(
   input: string[],
   part: number,
@@ -36,7 +30,7 @@ export async function solve(
     if (line.trim() === "") continue;
     map.push(line.trim().split(""));
   }
-  if (test) dump(map);
+  if (test) dumpGrid(map);
   if (part === 1) {
     for (let y = 0; y < map.length; y++) {
       for (let x = 0; x < map[y].length; x++) {

@@ -9,6 +9,7 @@ export function dumpGrid<T>(grid: T[][]) {
         }
         widths.push(max);
     }
+    logger.log(`${grid[0].length}, ${grid.length}`);
     for (let row = 0; row < grid.length; row++) {
         logger.log(grid[row].map((s, i) => String(s).padStart(widths[i], ' ')).join(' '));
     }
