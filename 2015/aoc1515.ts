@@ -1,4 +1,4 @@
-import { argsToOptions NotImplemented, Options, run } from "aoc-copilot";
+import { argsToOptions, NotImplemented, Options, run } from "aoc-copilot";
 
 type AdditionalInfo = {
     [key: string]: string;
