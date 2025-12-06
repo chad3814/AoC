@@ -1,39 +1,11 @@
 import { NotImplemented, run, logger } from "aoc-copilot";
+import { dumpGrid, rotateGrid } from "../utils/grid";
 
 type AdditionalInfo = {
     [key: string]: string;
 };
 
 const RE = /\s+/ug;
-
-function rotateGrid(grid: string[][]): string[][] {
-    const width = grid[0].length;
-    const height = grid.length;
-    const out: string[][] = [];
-    for (let y = 0; y < width; y++) {
-        const row: string[] = [];
-        for (let x = 0; x < height; x++) {
-            row.push(grid[x][width - y - 1]);
-        }
-        out.push(row);
-    }
-    return out;
-}
-
-function dumpGrid(grid: string[][]) {
-    const widths: number[] = [];
-    for (let x = 0; x < grid[0].length; x++) {
-        let max = 0;
-        for (let y = 0; y < grid.length; y++) {
-            if (grid[y][x].length > max) max = grid[y][x].length;
-        }
-        widths.push(max);
-    }
-    for (let row = 0; row < grid.length; row++) {
-        logger.log(grid[row].map((s, i) => s.padStart(widths[i], ' ')).join(' '));
-    }
-}
-
 type Op = '*' | '+';
 
 function calc(op: Op, nums: number[]): number {
