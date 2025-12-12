@@ -8,7 +8,7 @@ type AdditionalInfo = {
 const RE = /\[(?<lights>[\.#]+)\] (?<buttons>(\(\d+(,\d+)*\) )+) ?\{(?<joltages>\d+(,\d+)*)\}/u;
 
 class Machine {
-    constructor(public readonly desired: number, public readonly buttons: number[], private joltages: number[]) {
+    constructor(public readonly desired: number, public readonly buttons: number[], public readonly joltages: number[], public readonly numericButtons: number[][]) {
         this.state = 0;
     }
 
@@ -71,8 +71,11 @@ export async function solve(
         );
 
         const buttons: number[] = [];
+        const numericButtons: number[][] = [];
         for (const buttonStr of matches.groups.buttons.split(' ')) {
+            if (!buttonStr || buttonStr.trim() === '') continue;
             const indexes = buttonStr.replace('(', '').replace(')', '').split(',').map(Number);
+            numericButtons.push(indexes);
             buttons.push(indexes.map(
                 i => 1 << i
             ).reduce(
@@ -80,7 +83,7 @@ export async function solve(
             ));
         }
         const joltages = matches.groups.joltages.split(',').map(Number);
-        machines.push(new Machine(desired, buttons, joltages));
+        machines.push(new Machine(desired, buttons, joltages, numericButtons));
     }
     let total = 0;
     if (part === 1) {
@@ -89,10 +92,9 @@ export async function solve(
 
             // Try progressively larger button combinations
             for (let targetSize = 1; targetSize <= machine.buttons.length && !found; targetSize++) {
-                // Try all bit patterns with exactly targetSize bits set
-                for (let mask = 0; mask < (1 << machine.buttons.length); mask++) {
-                    if (popcount(mask) !== targetSize) continue; // Skip wrong size
-
+                let mask = (1 << targetSize) - 1;
+                const limit = 1 << machine.buttons.length;
+                while (mask < limit) {
                     // Press buttons indicated by the mask
                     machine.reset();
                     for (let i = 0; i < machine.buttons.length; i++) {
@@ -107,12 +109,67 @@ export async function solve(
                         found = true;
                         break; // Found minimum for this machine
                     }
+
+                    // Gosper's hack: generate next mask with same popcount
+                    const c = mask & -mask;
+                    const r = mask + c;
+                    mask = (((r ^ mask) >>> 2) / c) | r;
                 }
             }
         }
         return total;
     }
-    throw new NotImplemented('Not Implemented');
+    for (const machine of machines) {
+        const target = machine.joltages;
+
+        // BFS with priority queue (Dijkstra's algorithm)
+        type State = { joltages: number[], presses: number };
+        const queue: State[] = [{ joltages: new Array(target.length).fill(0), presses: 0 }];
+        const visited = new Set<string>();
+
+        const stateKey = (joltages: number[]) => joltages.join(',');
+        visited.add(stateKey(queue[0].joltages));
+
+        let found = false;
+
+        while (queue.length > 0 && !found) {
+            // Get state with minimum presses (priority queue - simple sort for now)
+            queue.sort((a, b) => a.presses - b.presses);
+            const state = queue.shift()!;
+
+            // Check if we reached target
+            if (state.joltages.every((v, i) => v === target[i])) {
+                total += state.presses;
+                found = true;
+                if (test) logger.log(`Found solution: ${state.presses} presses`);
+                break;
+            }
+
+            // Try pressing each button
+            for (const button of machine.numericButtons) {
+                const next = [...state.joltages];
+
+                // Apply button press
+                for (const pos of button) {
+                    next[pos]++;
+                }
+
+                // Only continue if no position exceeds target
+                if (next.every((v, i) => v <= target[i])) {
+                    const key = stateKey(next);
+                    if (!visited.has(key)) {
+                        visited.add(key);
+                        queue.push({ joltages: next, presses: state.presses + 1 });
+                    }
+                }
+            }
+        }
+
+        if (!found) {
+            logger.error(`No solution found for machine`);
+        }
+    }
+    return total;
 }
 
 run(__filename, solve);
