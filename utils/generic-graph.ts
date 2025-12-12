@@ -1,3 +1,4 @@
+import { logger } from "aoc-copilot";
 import { DefaultMap } from "./default-map";
 import { LinkedList } from "./list-class";
 import { Memoable, memoize } from "./memoize";
@@ -76,6 +77,56 @@ export class Graph<T> extends LinkedList<GraphNode<T>> implements Memoable {
             }
             unvisited.delete(node);
         }
+    }
+
+    @memoize(3)
+    pathCount(start: GraphNode<T>, end: GraphNode<T>, f?: (set: Set<GraphNode<T>>) => boolean): number {
+        let count = 0;
+        const toVisit: [GraphNode<T>, Set<GraphNode<T>>][] = [[start, new Set([start])]];
+        const visited = new Set<GraphNode<T>>();
+        while (toVisit.length > 0) {
+            const [node, set] = toVisit.shift()!;
+            set.add(node);
+            logger.log(node.value);
+            if (node === end) {
+                if (!f || f(set)) count++;
+                continue;
+            }
+            visited.add(node);
+            for (const {node: exit} of node.exits) {
+                if (!visited.has(exit)) {
+                    toVisit.push([exit, new Set(set)]);
+                }
+            }
+        }
+        return count;
+    }
+
+    @memoize(2)
+    getAllPaths(start: GraphNode<T>, end: GraphNode<T>): Set<GraphNode<T>>[] {
+        const ret: Set<GraphNode<T>>[] = [];
+        const toVisit: [GraphNode<T>, Set<GraphNode<T>>][] = [[start, new Set([start])]];
+        const visited = new Set<GraphNode<T>>();
+        while (toVisit.length > 0) {
+            const [node, set] = toVisit.shift()!;
+            set.add(node);
+            logger.log(node.value);
+            if (node === end) {
+                logger.log('found end');
+                ret.push(set);
+                continue;
+            }
+            visited.add(node);
+            for (const {node: exit} of node.exits) {
+                if (!visited.has(exit)) {
+                    logger.log('adding', exit.value);
+                    toVisit.push([exit, new Set(set)]);
+                } else {
+                    logger.log('already visited', exit.value);
+                }
+            }
+        }
+        return ret;
     }
 
     minDistance(start: GraphNode<T>, visited: Set<GraphNode<T>> = new Set<GraphNode<T>>()): number {
