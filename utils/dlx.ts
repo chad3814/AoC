@@ -98,7 +98,7 @@ export class DLX {
                 }
                 let row = col.rows
                 do {
-                    let cel = row;
+                    let cell = row;
                     do {
                         cell.up.down = cell.down;
                         cell.down.up = cell.up;
@@ -106,7 +106,7 @@ export class DLX {
                         cell = cell.right;
                     } while (cell !== row);
                     row = row.down;
-                } while (row !== first);
+                } while (row !== col.rows);
             }
             count += this.solveCount(columns.filter(
                 col => !cols.includes(col)

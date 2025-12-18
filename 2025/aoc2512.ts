@@ -131,8 +131,8 @@ export async function solve(
                         const shapeHeight = shapeVer.length;
                         if (shapeWidth > tree.width || shapeHeight > tree.height) continue;
 
-                        for (let y = shapeHeight; y < tree.height; y++) {
-                            for (let x = shapeWidth; x < tree.width; x++) {
+                        for (let y = shapeHeight; y <= tree.height; y++) {
+                            for (let x = shapeWidth; x <= tree.width; x++) {
                                 copyShape(shapeVer, space, x - shapeWidth, y - shapeHeight, tree.width);
                                 space[nameIndex] = 1;
                                 dlx.addRow(space);
