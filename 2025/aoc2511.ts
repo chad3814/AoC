@@ -1,5 +1,6 @@
 import { NotImplemented, run, logger } from "aoc-copilot";
 import { Graph, GraphNode } from "../utils/generic-graph";
+import { MemoMap, MemoSet } from "../utils/memoize";
 
 type AdditionalInfo = {
     [key: string]: string;
@@ -11,40 +12,39 @@ export async function solve(
     test: boolean,
     additionalInfo?: AdditionalInfo,
 ): Promise<string | number> {
-    const nodes = new Map<string, GraphNode<string>>();
+    const g = new Map<string, Set<string>>();
     for (const line of input) {
         if (line.trim() === '') continue;
         const [name, outputs] = line.split(/:\s+/u);
-        const node = nodes.get(name) ?? new GraphNode(name);
-        for (const exit of outputs.split(/\s+/ug)) {
-            const exitNode = nodes.get(exit) ?? new GraphNode(exit);
-            node.addExit(exitNode, 0);
-            nodes.set(exit, exitNode);
-        }
-        nodes.set(name, node);
+        g.set(name, new Set(outputs.split(/\s+/ug)));
     }
-    const graph = new Graph(nodes.values());
     if (part === 1) {
-        return graph.pathCount(nodes.get('you')!, nodes.get('out')!);
+        return dp(g, 'you', 'out');
     }
-    const svr = nodes.get('svr');
-    const dac = nodes.get('dac');
-    const fft = nodes.get('fft');
-    const out = nodes.get('out');
-    if (!svr) {
-        console.error('nodes:', [...nodes.keys()]);
-        throw new Error('no svr node');
+
+    let route1 = dp(g, 'svr', 'dac');
+    route1 *= dp(g, 'dac', 'fft');
+    route1 *= dp(g, 'fft', 'out');
+
+    let route2 = dp(g, 'svr', 'fft');
+    route2 *= dp(g, 'fft', 'dac');
+    route2 *= dp(g, 'dac', 'out');
+
+    return route1 + route2;
+
+    function dp(graph: Map<string, Set<string>>, start: string, end: string) {
+        const memo: Map<string, number> = new Map();
+        function dfs(current: string): number {
+            if (current === end) return 1;
+            const memoVal = memo.get(current);
+            if (memoVal !== undefined) return memoVal;
+            const total = [...graph.get(current) ?? []].reduce((t, c) => t + dfs(c), 0);
+            memo.set(current, total);
+            return total;
+        }
+        return dfs(start);
     }
-    if (!dac) {
-        throw new Error('no dac node');
-    }
-    if (!fft) {
-        throw new Error('no fft node');
-    }
-    if (!out) {
-        throw new Error('no out node');
-    }
-    return graph.pathCount(svr, out, (set) => set.has(dac) && set.has(fft));
+
 }
 
 run(__filename, solve, {}, {

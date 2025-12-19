@@ -35,3 +35,31 @@ export function memoize<This, T extends Params, R>(
         }
     }
 }
+
+export class MemoSet<T extends Memoable> extends Set<T> implements Memoable {
+    toMemo(): string {
+        return `ms${[...super.values()].map(v => v.toMemo()).sort().join(',')}`;
+    }
+}
+
+export class MemoMap<T, U> extends Map<T, U> implements Memoable {
+    toMemo(): string {
+        const map = new Map<string,string>();
+        for (const [k, v] of super.entries()) {
+            let key: string;
+            let value: string;
+            if ((k as {toMemo?: () => string}).toMemo) {
+                key = (k as {toMemo: () => string}).toMemo();
+            } else {
+                key = String(k);
+            }
+            if ((v as {toMemo?: () => string}).toMemo) {
+                value = (v as {toMemo: () => string}).toMemo();
+            } else {
+                value = String(v);
+            }
+            map.set(key, value);
+        }
+        return `mm${[...map.entries()].map(([k, v]) => `${k}-${v}`).sort().join(',')}`;
+    }
+}

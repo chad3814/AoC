@@ -1,7 +1,7 @@
 import { logger } from "aoc-copilot";
 import { DefaultMap } from "./default-map";
 import { LinkedList } from "./list-class";
-import { Memoable, memoize } from "./memoize";
+import { Memoable, memoize, MemoMap, MemoSet } from "./memoize";
 
 type ExitCost<T> = {
     node: GraphNode<T>;
@@ -13,6 +13,7 @@ export class GraphNode<T> implements Memoable {
         public value: T,
     ) {
         this.id = GraphNode.count++;
+        this.mark = false;
     }
 
     public addExit(node: GraphNode<T>, cost: number): void {
@@ -27,8 +28,13 @@ export class GraphNode<T> implements Memoable {
         return `{gn${this.id}}`;
     }
 
+    toString() {
+        return this.value;
+    }
+
     private id: number;
     private _exits = new Map<T, ExitCost<T>>();
+    public mark: boolean;
     private static count = 0;
 };
 
@@ -79,26 +85,119 @@ export class Graph<T> extends LinkedList<GraphNode<T>> implements Memoable {
         }
     }
 
+    @memoize(4)
+    recursiveCount(start: GraphNode<T>, end: GraphNode<T>, dac = false, fft = false): number {
+        if (start === end) {
+            if (dac && fft) {
+                return 1;
+            }
+            return 0;
+        }
+        let count = 0;
+        start.mark = true;
+        if (start.value === 'dac') {
+            dac = true;
+        }
+        if (start.value === 'fft') {
+            fft = true;
+        }
+        for (const {node} of start.exits) {
+            if (!node.mark)
+                count += this.recursiveCount(node, end, dac, fft);
+        }
+        start.mark = false;
+        return count;
+    }
+
     @memoize(3)
     pathCount(start: GraphNode<T>, end: GraphNode<T>, f?: (set: Set<GraphNode<T>>) => boolean): number {
         let count = 0;
+        let iterations = 0;
         const toVisit: [GraphNode<T>, Set<GraphNode<T>>][] = [[start, new Set([start])]];
-        const visited = new Set<GraphNode<T>>();
         while (toVisit.length > 0) {
-            const [node, set] = toVisit.shift()!;
-            set.add(node);
-            logger.log(node.value);
+            const [node, set] = toVisit.pop()!;  // Use pop() for DFS - much faster
+            iterations++;
+            if (iterations % 10_000_000 === 0) {
+                console.log(`Iterations: ${iterations}, Queue: ${toVisit.length}, Count: ${count}`);
+            }
             if (node === end) {
                 if (!f || f(set)) count++;
                 continue;
             }
-            visited.add(node);
             for (const {node: exit} of node.exits) {
-                if (!visited.has(exit)) {
-                    toVisit.push([exit, new Set(set)]);
+                if (!set.has(exit)) {  // Check current path, not global visited
+                    const newSet = new Set(set);
+                    newSet.add(exit);
+                    toVisit.push([exit, newSet]);
                 }
             }
         }
+        console.log(`Total iterations: ${iterations}, Final count: ${count}`);
+        return count;
+    }
+
+    // Optimized path counting for graphs with specific required nodes
+    pathCountThrough(start: GraphNode<T>, end: GraphNode<T>, required: GraphNode<T>[]): number {
+        // State: (node, visited_set, required_bitmask)
+        // Use bitmask to track which required nodes we've visited
+        type State = [GraphNode<T>, Set<GraphNode<T>>];
+        const getRequiredIndex = (node: GraphNode<T>) => required.indexOf(node);
+        const allRequired = (1 << required.length) - 1;
+
+        let count = 0;
+        const toVisit: State[][] = [];
+        for (let i = 0; i <= allRequired; i++) {
+            toVisit.push([]);
+        }
+        toVisit[0].push([start, new Set([start])]);
+        let iterations = 0;
+        while (toVisit.some(tv => tv.length > 0)) {
+            let n: GraphNode<T>|null = null;
+            let v: Set<GraphNode<T>>|null = null;
+            let m: number|null = null;
+            for (let j = allRequired; j >= 0; j--) {
+                if (toVisit[j].length > 0) {
+                    const tv = toVisit[j].pop()!
+                    n = tv[0];
+                    v = tv[1];
+                    m = j;
+                    break;
+                }
+            }
+            if (n === null || v === null || m === null) {
+                console.error(`node: ${n}, visited: ${v}; requiredMask: ${m}`);
+                throw new Error("shouldn't happen");
+            }
+            const [node, visited, requiredMask] = [n, v, m];
+
+            iterations++;
+            if ((iterations % 10_000_000) === 0) {
+                console.log(`${iterations}, at ${node} with ${visited.size} visited and ${requiredMask} mask; ${toVisit.map(tv => tv.length)} to visit`);
+            }
+            if (node === end) {
+                // Check if all required nodes were visited
+                if (requiredMask === allRequired) {
+                    count++;
+                }
+                continue;
+            }
+
+            for (const {node: exit} of node.exits) {
+                if (!visited.has(exit)) {
+                    const newVisited = new Set(visited);
+                    newVisited.add(exit);
+
+                    let newMask = requiredMask;
+                    const reqIndex = getRequiredIndex(exit);
+                    if (reqIndex >= 0) {
+                        newMask |= (1 << reqIndex);
+                    }
+
+                    toVisit[newMask].push([exit, newVisited]);
+                }
+            }
+        }
+
         return count;
     }
 
@@ -110,19 +209,19 @@ export class Graph<T> extends LinkedList<GraphNode<T>> implements Memoable {
         while (toVisit.length > 0) {
             const [node, set] = toVisit.shift()!;
             set.add(node);
-            logger.log(node.value);
+            // logger.log(node.value);
             if (node === end) {
-                logger.log('found end');
+                // logger.log('found end');
                 ret.push(set);
                 continue;
             }
             visited.add(node);
             for (const {node: exit} of node.exits) {
                 if (!visited.has(exit)) {
-                    logger.log('adding', exit.value);
+                    // logger.log('adding', exit.value);
                     toVisit.push([exit, new Set(set)]);
                 } else {
-                    logger.log('already visited', exit.value);
+                    // logger.log('already visited', exit.value);
                 }
             }
         }
